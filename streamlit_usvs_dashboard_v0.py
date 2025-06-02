@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# --- Setup ---
+# === Page config ===
 st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
 st.title("📊 Global USV's Dashboard – Excel Viewer")
 
@@ -10,62 +10,58 @@ Use the filters below to interactively explore the dataset.
 All filters perform **keyword-based matching**, so partial values like `MBES` will still find matching rows.
 """)
 
-# --- Load Data ---
-@st.cache_data
-def load_data():
-    df = pd.read_csv("USVs_SUmmary_improve.csv")
-    df = df.dropna(how="all")
-    df.columns = df.columns.str.strip()
-    return df
+# === Load and clean Excel ===
+df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
+df = df.dropna(how="all")
+df.columns = df.columns.str.strip()
 
-df = load_data()
-
-# --- Session Filter State ---
-if "filters" not in st.session_state:
-    st.session_state.filters = {}
-if "reset_trigger" not in st.session_state:
-    st.session_state.reset_trigger = False
-
-# --- Sidebar: Keyword Filters ---
-with st.sidebar:
-    st.subheader("🔍 Keyword Filters")
-    
-    if st.button("🔄 Clear All Filters"):
-        st.session_state.filters = {}
-        st.session_state.reset_trigger = True
-        st.experimental_rerun()
-
-    keyword_filters = {}
-    for col in df.select_dtypes(include='object').columns:
-        default_val = "" if st.session_state.reset_trigger else st.session_state.filters.get(col, "")
-        user_input = st.text_input(f"{col} (keywords)", value=default_val, key=col)
-        if user_input:
-            keyword_filters[col] = user_input.strip()
-            st.session_state.filters[col] = user_input.strip()
-
-    st.session_state.reset_trigger = False
-
-# --- Apply Keyword Filters (partial match)
-filtered_df = df.copy()
-for col, keyword in keyword_filters.items():
-    keyword_lower = keyword.lower()
-    filtered_df = filtered_df[filtered_df[col].astype(str).str.lower().str.contains(keyword_lower)]
-
-# --- Configure clickable link for Spec Sheet column
+# === Convert Spec Sheet column to Streamlit link config ===
 link_config = {}
-if "Spec Sheet (URL)" in df.columns:
-    link_config["Spec Sheet (URL)"] = st.column_config.LinkColumn(
-        label="Spec Sheet (URL)",
-        help="Click to open official USV specification",
-        validate="^https?://.*"
+if "Spec Sheet" in df.columns:
+    df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
+        lambda x: x if x.startswith("http") else ""
+    )
+    link_config["Spec Sheet"] = st.column_config.LinkColumn(
+        label="Spec Sheet",
+        help="Click to view full spec sheet",
+        validate="^https?:\\/\\/.+$"
     )
 
-# --- Display Results Table ---
+# === Clear filter logic ===
+if "clear_filters" not in st.session_state:
+    st.session_state.clear_filters = False
+
+# === Sidebar filters ===
+with st.sidebar:
+    st.subheader("🔍 Keyword Filters")
+    if st.button("🔄 Clear All Filters"):
+        st.session_state.clear_filters = True
+        st.rerun()
+
+    keyword_filters = {}
+    for col in df.select_dtypes(include=["object", "category"]).columns:
+        values = df[col].dropna().unique().tolist()
+        if 1 < len(values) < 40:
+            default = [] if st.session_state.clear_filters else None
+            selected_keywords = st.multiselect(f"{col} (keywords)", values, default=default, key=col)
+            if selected_keywords:
+                keyword_filters[col] = selected_keywords
+
+    st.session_state.clear_filters = False
+
+# === Apply filtering ===
+filtered_df = df.copy()
+for col, keywords in keyword_filters.items():
+    filtered_df = filtered_df[filtered_df[col].apply(
+        lambda x: any(kw.lower() in str(x).lower() for kw in keywords)
+    )]
+
+# === Display table ===
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
-
-st.dataframe(
+st.data_editor(
     filtered_df,
+    column_config=link_config,
     use_container_width=True,
-    column_config=link_config
+    disabled=True  # makes cells read-only
 )
