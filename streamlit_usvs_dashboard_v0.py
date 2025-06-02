@@ -14,47 +14,46 @@ df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# === Detect link columns and convert ===
+# === Convert Spec Sheet column to Streamlit link config ===
+link_config = {}
 if "Spec Sheet" in df.columns:
     df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
-        lambda x: f"[Spec Sheet]({x})" if x.startswith("http") else x
+        lambda x: x if x.startswith("http") else ""
+    )
+    link_config["Spec Sheet"] = st.column_config.LinkColumn(
+        "Spec Sheet",
+        help="Click to view full spec sheet",
+        validate="^https?:\\/\\/.+$"
     )
 
-# === Init session state for clearing filters ===
+# === Clear filter logic
 if "clear_filters" not in st.session_state:
     st.session_state.clear_filters = False
 
-# === Sidebar filters ===
+# === Filters
 with st.sidebar:
-    st.subheader("🧊 Filters")
+    st.subheader("🔍 Filters")
     if st.button("🔄 Clear All Filters"):
         st.session_state.clear_filters = True
         st.rerun()
 
     filters = {}
     for col in df.select_dtypes(include=['object', 'category']).columns:
-        options = df[col].dropna().unique().tolist()
-        if 1 < len(options) < 40:
-            default_vals = [] if st.session_state.clear_filters else None
-            selected = st.multiselect(
-                label=col,
-                options=options,
-                default=default_vals,
-                key=col
-            )
+        values = df[col].dropna().unique().tolist()
+        if 1 < len(values) < 40:
+            default = [] if st.session_state.clear_filters else None
+            selected = st.multiselect(col, values, default=default, key=col)
             if selected:
                 filters[col] = selected
 
     st.session_state.clear_filters = False
 
-# === Apply filters ===
+# === Apply Filters
 filtered_df = df.copy()
 for col, selected_vals in filters.items():
     filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
 
-# === Display as styled Markdown Table ===
+# === Display Table with link rendering
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
-st.markdown("### 📋 Filtered Results (Click links to open spec sheets)")
-
-# Convert to markdown with link formatting
-st.markdown(filtered_df.to_markdown(index=False), unsafe_allow_html=True)
+st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
+st.dataframe(filtered_df, column_config=link_config, use_container_width=True)
