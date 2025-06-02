@@ -32,7 +32,7 @@ with st.sidebar:
         st.session_state.dropdown_filters = {}
         st.session_state.global_keyword = ""
         st.session_state.reset_triggered = True
-        st.experimental_rerun()
+        st.rerun()
 
     # Global keyword input
     global_input = st.text_input("🌐 Global Keyword (search all fields)", value=st.session_state.global_keyword)
