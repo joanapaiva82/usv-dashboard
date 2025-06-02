@@ -9,53 +9,51 @@ Use the filters below to interactively explore the dataset.
 All filters perform keyword-based matching, so partial values like `MBES` will still find matching rows.
 """)
 
-# === Load and clean Excel ===
-df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
+# === Load dataset ===
+df = pd.read_csv("USVs_SUmmary.csv")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# === Convert Spec Sheet column to Streamlit link config ===
+# === Ensure Spec Sheet links are clean ===
 link_config = {}
 if "Spec Sheet" in df.columns:
     df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
         lambda x: x if x.startswith("http") else ""
     )
     link_config["Spec Sheet"] = st.column_config.LinkColumn(
-        "Spec Sheet",
-        help="Click to view full spec sheet",
-        validate="^https?:\\/\\/.+$"
+        "Spec Sheet", help="Click to view spec sheet", validate="^https?:\\/\\/.+$"
     )
 
-# === Clear filter logic
+# === Session filter tracking ===
 if "clear_filters" not in st.session_state:
     st.session_state.clear_filters = False
 
-# === Sidebar filters (keyword-based)
+# === Sidebar filters ===
 with st.sidebar:
     st.subheader("🔍 Keyword Filters")
+
     if st.button("🔄 Clear All Filters"):
-        st.session_state.clear_filters = True
+        for col in df.columns:
+            if df[col].dtype == "object":
+                st.session_state[col] = ""
         st.rerun()
 
-    keyword_filters = {}
-    for col in df.select_dtypes(include=["object", "category"]).columns:
-        values = df[col].dropna().unique().tolist()
-        if 1 < len(values) < 40:
-            default = [] if st.session_state.clear_filters else None
-            selected_keywords = st.multiselect(f"{col} (keywords)", values, default=default, key=col)
-            if selected_keywords:
-                keyword_filters[col] = selected_keywords
+    filters = {}
+    for col in df.columns:
+        if df[col].dtype == "object":
+            current_value = st.session_state.get(col, "")
+            search_input = st.text_input(f"{col} (keywords)", value=current_value, key=col)
+            if search_input.strip():
+                filters[col] = search_input.lower().split(",")
 
-    st.session_state.clear_filters = False
-
-# === Apply keyword-based filtering
+# === Apply keyword filters ===
 filtered_df = df.copy()
-for col, keywords in keyword_filters.items():
-    filtered_df = filtered_df[filtered_df[col].apply(
-        lambda x: any(kw.lower() in str(x).lower() for kw in keywords)
+for col, keywords in filters.items():
+    filtered_df = filtered_df[filtered_df[col].astype(str).str.lower().apply(
+        lambda cell: any(keyword.strip() in cell for keyword in keywords)
     )]
 
-# === Display Table with link rendering
-st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
+# === Display summary and table ===
+st.markdown(f"Loaded **{filtered_df.shape[0]}** rows × **{filtered_df.shape[1]}** columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 st.dataframe(filtered_df, column_config=link_config, use_container_width=True)
