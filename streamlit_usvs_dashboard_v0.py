@@ -16,6 +16,10 @@ df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
+# === Show available columns for debugging ===
+st.sidebar.caption("🧾 Columns found in Excel:")
+st.sidebar.code(", ".join(df.columns))
+
 # === Convert 'Spec Sheet' column to clickable links ===
 link_config = {}
 if "Spec Sheet" in df.columns:
@@ -28,11 +32,7 @@ if "Spec Sheet" in df.columns:
         validate="^https?:\\/\\/.+$"
     )
 
-# === Session state logic ===
-if "clear_filters" not in st.session_state:
-    st.session_state.clear_filters = False
-
-# === Define columns to filter ===
+# === Filter columns you want to include ===
 filter_columns = [
     "Name & Manufacturer",
     "Main Application",
@@ -46,6 +46,10 @@ filter_columns = [
     "Country of Origin"
 ]
 
+# === Session state ===
+if "clear_filters" not in st.session_state:
+    st.session_state.clear_filters = False
+
 # === Sidebar filters ===
 with st.sidebar:
     st.subheader("🔍 Keyword Filters")
@@ -58,36 +62,37 @@ with st.sidebar:
     text_filters = {}
 
     for col in filter_columns:
-        st.markdown(f"**{col}**")
+        if col in df.columns:
+            st.markdown(f"**{col}**")
 
-        # Dropdown list
-        unique_values = sorted(df[col].dropna().unique().tolist())
-        default_multi = [] if st.session_state.clear_filters else None
-        selected = st.multiselect(f"{col} (select)", unique_values, default=default_multi, key=f"multi_{col}")
-        if selected:
-            multiselect_filters[col] = selected
+            # Dropdown
+            unique_values = sorted(df[col].dropna().unique().tolist())
+            default_multi = [] if st.session_state.clear_filters else None
+            selected = st.multiselect(f"{col} (select)", unique_values, default=default_multi, key=f"multi_{col}")
+            if selected:
+                multiselect_filters[col] = selected
 
-        # Free text input
-        user_input = st.text_input(f"{col} (contains text)", "", key=f"text_{col}")
-        if user_input.strip():
-            text_filters[col] = user_input.strip().lower()
+            # Text input
+            user_input = st.text_input(f"{col} (contains text)", "", key=f"text_{col}")
+            if user_input.strip():
+                text_filters[col] = user_input.strip().lower()
+        else:
+            st.warning(f"⚠️ Column not found in file: `{col}`", icon="⚠️")
 
     st.session_state.clear_filters = False
 
 # === Apply filters ===
 filtered_df = df.copy()
 
-# Apply dropdown filters
+# Dropdown filters
 for col, values in multiselect_filters.items():
     filtered_df = filtered_df[filtered_df[col].isin(values)]
 
-# Apply free text filters
+# Text input filters
 for col, keyword in text_filters.items():
-    filtered_df = filtered_df[
-        filtered_df[col].astype(str).str.lower().str.contains(keyword)
-    ]
+    filtered_df = filtered_df[filtered_df[col].astype(str).str.lower().str.contains(keyword)]
 
-# === Display table ===
+# === Display results ===
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 
