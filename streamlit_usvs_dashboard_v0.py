@@ -6,8 +6,9 @@ st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
 st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
-Use the filters below to interactively explore the dataset.  
-All filters support **free text**, so partial values like `MBES` or `solar` will match all relevant rows.
+Use the filters below to explore the dataset.  
+Each column has both **dropdown filters** and **free-text search**.  
+You can type things like `MBES`, `solar`, or `Australia` to filter results.
 """)
 
 # === Load and clean Excel file ===
@@ -15,7 +16,7 @@ df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# === Convert 'Spec Sheet' to clickable links ===
+# === Convert 'Spec Sheet' column to clickable links ===
 link_config = {}
 if "Spec Sheet" in df.columns:
     df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
@@ -27,11 +28,25 @@ if "Spec Sheet" in df.columns:
         validate="^https?:\\/\\/.+$"
     )
 
-# === Filter logic ===
+# === Session state logic ===
 if "clear_filters" not in st.session_state:
     st.session_state.clear_filters = False
 
-# === Sidebar: free-text keyword filters ===
+# === Define columns to filter ===
+filter_columns = [
+    "Name & Manufacturer",
+    "Main Application",
+    "Dimensions & Weight",
+    "Endurance & Speed",
+    "Sensor Suite",
+    "Propulsion & Power",
+    "Certifications",
+    "Autonomy Level",
+    "Applications",
+    "Country of Origin"
+]
+
+# === Sidebar filters ===
 with st.sidebar:
     st.subheader("🔍 Keyword Filters")
 
@@ -39,35 +54,40 @@ with st.sidebar:
         st.session_state.clear_filters = True
         st.rerun()
 
-    keyword_filters = {}
-    text_filter_columns = [
-        "Name & Manufacturer",
-        "Main Application",
-        "Dimensions & Weight",
-        "Endurance & Speed",
-        "Sensor Suite",
-        "Propulsion & Power",
-        "Certifications",
-        "Autonomy Level",
-        "Applications",
-        "Country of Origin"
-    ]
+    multiselect_filters = {}
+    text_filters = {}
 
-    for col in text_filter_columns:
-        user_input = st.text_input(f"{col} (contains)", "", key=col)
+    for col in filter_columns:
+        st.markdown(f"**{col}**")
+
+        # Dropdown list
+        unique_values = sorted(df[col].dropna().unique().tolist())
+        default_multi = [] if st.session_state.clear_filters else None
+        selected = st.multiselect(f"{col} (select)", unique_values, default=default_multi, key=f"multi_{col}")
+        if selected:
+            multiselect_filters[col] = selected
+
+        # Free text input
+        user_input = st.text_input(f"{col} (contains text)", "", key=f"text_{col}")
         if user_input.strip():
-            keyword_filters[col] = user_input.strip().lower()
+            text_filters[col] = user_input.strip().lower()
 
     st.session_state.clear_filters = False
 
 # === Apply filters ===
 filtered_df = df.copy()
-for col, keyword in keyword_filters.items():
+
+# Apply dropdown filters
+for col, values in multiselect_filters.items():
+    filtered_df = filtered_df[filtered_df[col].isin(values)]
+
+# Apply free text filters
+for col, keyword in text_filters.items():
     filtered_df = filtered_df[
         filtered_df[col].astype(str).str.lower().str.contains(keyword)
     ]
 
-# === Display results ===
+# === Display table ===
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 
