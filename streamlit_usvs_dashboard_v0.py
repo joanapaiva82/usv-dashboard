@@ -10,54 +10,57 @@ Use the filters below to interactively explore the dataset.
 All filters support **keyword-based partial match**, so typing `MBES` will match all relevant entries.
 """)
 
-# --- Load Excel File ---
+# --- Load Excel ---
 df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# --- Sidebar ---
+# --- Setup session_state for global state ---
+if "global_keyword" not in st.session_state:
+    st.session_state.global_keyword = ""
+
+# --- Sidebar Filters ---
 with st.sidebar:
     st.subheader("🔎 Keyword Filters")
 
-    # --- Clear All Filters Logic ---
+    # --- Global Reset Button ---
     if st.button("🔄 Clear All Filters"):
-        for key in list(st.session_state.keys()):
-            if key.startswith("filter_") or key == "global_keyword":
-                del st.session_state[key]
+        st.session_state.clear()
         st.rerun()
 
     # --- Global Keyword ---
-    global_keyword = st.text_input("🌐 Global Keyword (search all fields)", key="global_keyword")
+    global_input = st.text_input("🌐 Global Keyword (search all fields)", key="global_keyword")
 
-    # --- Dropdown Filters per Column ---
+    # --- Dropdown filters ---
     dropdown_filters = {}
     for col in df.select_dtypes(include='object').columns:
+        col_key = f"filter_{col}"
         options = sorted(df[col].dropna().unique().tolist())
-        selected = st.multiselect(col, options, key=f"filter_{col}")
+        selected = st.multiselect(col, options, default=[], key=col_key)
         if selected:
             dropdown_filters[col] = selected
 
-# --- Apply Filters ---
+# --- Filtering ---
 filtered_df = df.copy()
 
-# Apply global keyword (partial match across all columns)
-if global_keyword:
-    keyword = global_keyword.lower()
+# Apply global keyword
+if global_input:
+    keyword = global_input.lower()
     mask = filtered_df.apply(lambda row: row.astype(str).str.lower().str.contains(keyword).any(), axis=1)
     filtered_df = filtered_df[mask]
 
-# Apply dropdown filters (partial match in cell)
+# Apply dropdown filters (partial match)
 for col, selected_vals in dropdown_filters.items():
     filtered_df = filtered_df[
-        filtered_df[col].astype(str).apply(lambda x: any(sel.lower() in x.lower() for sel in selected_vals))
+        filtered_df[col].astype(str).apply(lambda x: any(val.lower() in x.lower() for val in selected_vals))
     ]
 
-# --- Spec Sheet Link Column ---
+# --- Spec Sheet Links ---
 link_config = {}
 if "Spec Sheet (URL)" in df.columns:
     link_config["Spec Sheet (URL)"] = st.column_config.LinkColumn(
         "Spec Sheet (URL)",
-        help="Click to open manufacturer specification link"
+        help="Click to view manufacturer specification"
     )
 
 # --- Display Results ---
