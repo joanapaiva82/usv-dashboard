@@ -6,7 +6,7 @@ st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
 Use the filters below to interactively explore the dataset.  
-All columns are searchable and sortable. Filter by any category just like in Excel.
+All filters perform keyword-based matching, so partial values like `MBES` will still find matching rows.
 """)
 
 # === Load and clean Excel ===
@@ -30,28 +30,30 @@ if "Spec Sheet" in df.columns:
 if "clear_filters" not in st.session_state:
     st.session_state.clear_filters = False
 
-# === Filters
+# === Sidebar filters (keyword-based)
 with st.sidebar:
-    st.subheader("🔍 Filters")
+    st.subheader("🔍 Keyword Filters")
     if st.button("🔄 Clear All Filters"):
         st.session_state.clear_filters = True
         st.rerun()
 
-    filters = {}
-    for col in df.select_dtypes(include=['object', 'category']).columns:
+    keyword_filters = {}
+    for col in df.select_dtypes(include=["object", "category"]).columns:
         values = df[col].dropna().unique().tolist()
         if 1 < len(values) < 40:
             default = [] if st.session_state.clear_filters else None
-            selected = st.multiselect(col, values, default=default, key=col)
-            if selected:
-                filters[col] = selected
+            selected_keywords = st.multiselect(f"{col} (keywords)", values, default=default, key=col)
+            if selected_keywords:
+                keyword_filters[col] = selected_keywords
 
     st.session_state.clear_filters = False
 
-# === Apply Filters
+# === Apply keyword-based filtering
 filtered_df = df.copy()
-for col, selected_vals in filters.items():
-    filtered_df = filtered_df[filtered_df[col].isin(selected_vals)]
+for col, keywords in keyword_filters.items():
+    filtered_df = filtered_df[filtered_df[col].apply(
+        lambda x: any(kw.lower() in str(x).lower() for kw in keywords)
+    )]
 
 # === Display Table with link rendering
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
