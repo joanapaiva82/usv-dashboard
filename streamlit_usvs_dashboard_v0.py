@@ -8,8 +8,8 @@ st.title("📊 Global USV's Dashboard – Excel Viewer")
 st.markdown("""
 Use the filters below to explore the dataset.
 
-- Use the **Global Keyword Search** to search across all columns  
-- Use the dropdown filters in the sidebar to refine results  
+- Use the **Global Keyword Search** above to search across all columns  
+- Use the **dropdown filters** on the left to refine your search  
 - Click "Clear All Filters" to reset everything  
 """)
 
@@ -18,21 +18,24 @@ df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# === Columns to filter ===
+# === Columns to filter (only those present)
+available_columns = df.columns.tolist()
 filter_columns = [
-    "Name & Manufacturer",
-    "Main Application",
-    "Dimensions & Weight",
-    "Endurance & Speed",
-    "Sensor Suite",
-    "Propulsion & Power",
-    "Certifications",
-    "Autonomy Level",
-    "Applications",
-    "Country of Origin"
+    col for col in [
+        "Name & Manufacturer",
+        "Main Application",
+        "Dimensions & Weight",
+        "Endurance & Speed",
+        "Sensor Suite",
+        "Propulsion & Power",
+        "Certifications",
+        "Autonomy Level",
+        "Applications",
+        "Country of Origin"
+    ] if col in available_columns
 ]
 
-# === Convert Spec Sheet to clickable links ===
+# === Convert Spec Sheet to clickable links
 link_config = {}
 if "Spec Sheet" in df.columns:
     df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
@@ -44,10 +47,14 @@ if "Spec Sheet" in df.columns:
         validate="^https?:\\/\\/.+$"
     )
 
-# === Global search input ===
+# === Global Keyword Search (top)
 global_keyword = st.text_input("🔍 Global Keyword Search (any column)", "", key="global_keyword").strip().lower()
 
-# === Sidebar filters (dropdowns only) ===
+# === Session state reset support
+if "clear_filters" not in st.session_state:
+    st.session_state.clear_filters = False
+
+# === Sidebar: dropdown filters only
 with st.sidebar:
     st.subheader("🛠️ Advanced Column Filters")
 
@@ -59,28 +66,25 @@ with st.sidebar:
 
     multiselect_filters = {}
     for col in filter_columns:
-        if col in df.columns:
-            options = sorted(df[col].dropna().unique().tolist())
-            selected = st.multiselect(f"{col}", options, key=f"multi_{col}")
-            if selected:
-                multiselect_filters[col] = selected
-        else:
-            st.warning(f"⚠️ Column not found in Excel: `{col}`", icon="⚠️")
+        options = sorted(df[col].dropna().unique().tolist())
+        selected = st.multiselect(f"{col}", options, key=f"multi_{col}")
+        if selected:
+            multiselect_filters[col] = selected
 
-# === Apply filters ===
+# === Apply filters
 filtered_df = df.copy()
 
-# Apply dropdown filters
+# Dropdown filters
 for col, selected_values in multiselect_filters.items():
     filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
 
-# Apply global keyword filter
+# Global keyword filter across all columns
 if global_keyword:
     filtered_df = filtered_df[
         filtered_df.apply(lambda row: row.astype(str).str.lower().str.contains(global_keyword).any(), axis=1)
     ]
 
-# === Display filtered results ===
+# === Display filtered table
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 
