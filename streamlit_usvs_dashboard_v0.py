@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="USV Summary Viewer", layout="wide")
-st.title("📄 Global USV's Dashboard – Excel Viewer")
+st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
+
+st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
 Use the filters below to interactively explore the dataset.  
@@ -10,7 +11,7 @@ All columns are searchable and sortable. You can also download the filtered resu
 """)
 
 # === Load Excel File ===
-df = pd.read_excel("USVs_Summary_improve", engine="openpyxl")
+df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df.columns = df.columns.str.strip()  # Clean whitespace from headers
 
 st.caption(f"Loaded `{df.shape[0]}` rows × `{df.shape[1]}` columns")
