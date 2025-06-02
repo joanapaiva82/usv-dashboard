@@ -1,21 +1,21 @@
 import streamlit as st
 import pandas as pd
 
-# === Page config ===
+# === Page setup ===
 st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
 st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
 Use the filters below to interactively explore the dataset.  
-All filters perform **keyword-based matching**, so partial values like `MBES` will still find matching rows.
+All filters support **free text**, so partial values like `MBES` or `solar` will match all relevant rows.
 """)
 
-# === Load and clean Excel ===
+# === Load and clean Excel file ===
 df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# === Convert Spec Sheet column to Streamlit link config ===
+# === Convert 'Spec Sheet' to clickable links ===
 link_config = {}
 if "Spec Sheet" in df.columns:
     df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
@@ -27,41 +27,53 @@ if "Spec Sheet" in df.columns:
         validate="^https?:\\/\\/.+$"
     )
 
-# === Clear filter logic ===
+# === Filter logic ===
 if "clear_filters" not in st.session_state:
     st.session_state.clear_filters = False
 
-# === Sidebar filters ===
+# === Sidebar: free-text keyword filters ===
 with st.sidebar:
     st.subheader("🔍 Keyword Filters")
+
     if st.button("🔄 Clear All Filters"):
         st.session_state.clear_filters = True
         st.rerun()
 
     keyword_filters = {}
-    for col in df.select_dtypes(include=["object", "category"]).columns:
-        values = df[col].dropna().unique().tolist()
-        if 1 < len(values) < 40:
-            default = [] if st.session_state.clear_filters else None
-            selected_keywords = st.multiselect(f"{col} (keywords)", values, default=default, key=col)
-            if selected_keywords:
-                keyword_filters[col] = selected_keywords
+    text_filter_columns = [
+        "Name & Manufacturer",
+        "Main Application",
+        "Dimensions & Weight",
+        "Endurance & Speed",
+        "Sensor Suite",
+        "Propulsion & Power",
+        "Certifications",
+        "Autonomy Level",
+        "Applications",
+        "Country of Origin"
+    ]
+
+    for col in text_filter_columns:
+        user_input = st.text_input(f"{col} (contains)", "", key=col)
+        if user_input.strip():
+            keyword_filters[col] = user_input.strip().lower()
 
     st.session_state.clear_filters = False
 
-# === Apply filtering ===
+# === Apply filters ===
 filtered_df = df.copy()
-for col, keywords in keyword_filters.items():
-    filtered_df = filtered_df[filtered_df[col].apply(
-        lambda x: any(kw.lower() in str(x).lower() for kw in keywords)
-    )]
+for col, keyword in keyword_filters.items():
+    filtered_df = filtered_df[
+        filtered_df[col].astype(str).str.lower().str.contains(keyword)
+    ]
 
-# === Display table ===
+# === Display results ===
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
+
 st.data_editor(
     filtered_df,
     column_config=link_config,
     use_container_width=True,
-    disabled=True  # makes cells read-only
+    disabled=True
 )
