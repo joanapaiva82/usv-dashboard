@@ -5,10 +5,16 @@ import pandas as pd
 st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
 st.title("📊 Global USV's Dashboard – Excel Viewer")
 
-st.markdown("""
-Use the filters below to interactively explore the dataset.  
-All filters support **keyword-based partial match**, so typing `MBES` will match all relevant entries.
-""")
+with st.expander("📌 Disclaimer (click to expand)"):
+    st.markdown("""
+    The information presented on this page has been compiled solely for **academic and research purposes** in support of a postgraduate dissertation.
+
+    All specifications, features, and descriptions of Uncrewed Surface Vessels (USVs) are based on **publicly available sources** at the time of compilation and **have not been independently verified**.
+
+    **⚠️ This content is not intended to serve as an official or authoritative source.**  
+    Do not rely on this data for operational, procurement, or technical decisions.  
+    Please consult the original manufacturers for validated information.
+    """)
 
 # --- Load Excel ---
 df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
@@ -67,3 +73,9 @@ if "Spec Sheet (URL)" in df.columns:
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 st.dataframe(filtered_df, use_container_width=True, column_config=link_config)
+
+st.markdown("""
+---
+**Disclaimer:**  
+This app is intended for academic research only. All USV data shown is based on public sources and has not been independently verified. Do not rely on this content for operational or commercial purposes. Always refer to the original manufacturers for accurate specifications.
+""")
