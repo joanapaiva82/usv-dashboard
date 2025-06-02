@@ -82,6 +82,3 @@ st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` c
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 st.dataframe(filtered_df, use_container_width=True, column_config=link_config)
 
-**Disclaimer:**  
-This app is intended for academic research only. All USV data shown is based on public sources and has not been independently verified. Do not rely on this content for operational or commercial purposes. Always refer to the original manufacturers for accurate specifications.
-""")
