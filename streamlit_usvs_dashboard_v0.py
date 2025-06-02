@@ -1,95 +1,71 @@
 import streamlit as st
 import pandas as pd
 
-# === Page setup ===
+# --- Setup ---
 st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
 st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
-Use the filters below to explore the dataset.
-
-- Use the **Global Keyword Search** above to search across all columns  
-- Use the **dropdown filters** on the left to refine your search  
-- Click "Clear All Filters" to reset everything  
+Use the filters below to interactively explore the dataset.  
+All filters perform **keyword-based matching**, so partial values like `MBES` will still find matching rows.
 """)
 
-# === Load Excel ===
-df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
-df = df.dropna(how="all")
-df.columns = df.columns.str.strip()
+# --- Load Data ---
+@st.cache_data
+def load_data():
+    df = pd.read_csv("USVs_SUmmary_improve.csv")
+    df = df.dropna(how="all")
+    df.columns = df.columns.str.strip()
+    return df
 
-# === Columns to filter (only those present) ===
-available_columns = df.columns.tolist()
-filter_columns = [
-    col for col in [
-        "Name & Manufacturer",
-        "Main Application",
-        "Dimensions & Weight",
-        "Endurance & Speed",
-        "Sensor Suite",
-        "Propulsion & Power",
-        "Certifications",
-        "Autonomy Level",
-        "Applications",
-        "Country of Origin"
-    ] if col in available_columns
-]
+df = load_data()
 
-# === Register global keyword early so it’s safe to reset
-global_keyword = st.text_input("🔍 Global Keyword Search (any column)", "", key="global_keyword").strip().lower()
+# --- Session Filter State ---
+if "filters" not in st.session_state:
+    st.session_state.filters = {}
+if "reset_trigger" not in st.session_state:
+    st.session_state.reset_trigger = False
 
-# === Convert Spec Sheet to clickable links
-link_config = {}
-if "Spec Sheet" in df.columns:
-    df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
-        lambda x: x if x.startswith("http") else ""
-    )
-    link_config["Spec Sheet"] = st.column_config.LinkColumn(
-        label="Spec Sheet",
-        help="Click to view full spec sheet",
-        validate="^https?:\\/\\/.+$"
-    )
-
-# === Session state reset logic ===
-if "clear_filters" not in st.session_state:
-    st.session_state.clear_filters = False
-
-# === Sidebar filters ===
+# --- Sidebar: Keyword Filters ---
 with st.sidebar:
-    st.subheader("🛠️ Advanced Column Filters")
-
+    st.subheader("🔍 Keyword Filters")
+    
     if st.button("🔄 Clear All Filters"):
-        # ✅ SAFELY reset values only after keys exist
-        st.session_state["global_keyword"] = ""
-        for col in filter_columns:
-            st.session_state[f"multi_{col}"] = []
-        st.rerun()
+        st.session_state.filters = {}
+        st.session_state.reset_trigger = True
+        st.experimental_rerun()
 
-    multiselect_filters = {}
-    for col in filter_columns:
-        options = sorted(df[col].dropna().unique().tolist())
-        selected = st.multiselect(f"{col}", options, key=f"multi_{col}")
-        if selected:
-            multiselect_filters[col] = selected
+    keyword_filters = {}
+    for col in df.select_dtypes(include='object').columns:
+        default_val = "" if st.session_state.reset_trigger else st.session_state.filters.get(col, "")
+        user_input = st.text_input(f"{col} (keywords)", value=default_val, key=col)
+        if user_input:
+            keyword_filters[col] = user_input.strip()
+            st.session_state.filters[col] = user_input.strip()
 
-# === Apply filters
+    st.session_state.reset_trigger = False
+
+# --- Apply Keyword Filters (partial match)
 filtered_df = df.copy()
+for col, keyword in keyword_filters.items():
+    keyword_lower = keyword.lower()
+    filtered_df = filtered_df[filtered_df[col].astype(str).str.lower().str.contains(keyword_lower)]
 
-for col, selected_values in multiselect_filters.items():
-    filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
+# --- Configure clickable link for Spec Sheet column
+link_config = {}
+if "Spec Sheet (URL)" in df.columns:
+    link_config["Spec Sheet (URL)"] = st.column_config.LinkColumn(
+        label="Spec Sheet (URL)",
+        help="Click to open official USV specification",
+        validate="^https?://.*"
+    )
 
-if global_keyword:
-    filtered_df = filtered_df[
-        filtered_df.apply(lambda row: row.astype(str).str.lower().str.contains(global_keyword).any(), axis=1)
-    ]
-
-# === Display filtered results
+# --- Display Results Table ---
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 
-st.data_editor(
+st.dataframe(
     filtered_df,
-    column_config=link_config,
     use_container_width=True,
-    disabled=True
+    column_config=link_config
 )
