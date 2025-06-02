@@ -1,15 +1,16 @@
 import streamlit as st
 import pandas as pd
 
-# === Page config ===
+# === Page setup ===
 st.set_page_config(page_title="Global USV's Dashboard", layout="wide")
 st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
-Use the filters below to explore the dataset.  
-- Type in the global **keyword box** to search across all columns  
-- Use **dropdown filters** or **text search** per column  
-- Click "Clear All Filters" to reset everything
+Use the filters below to explore the dataset.
+
+- Use the **Global Keyword Search** to search across all columns  
+- Use the dropdown filters in the sidebar to refine results  
+- Click "Clear All Filters" to reset everything  
 """)
 
 # === Load Excel ===
@@ -43,58 +44,35 @@ if "Spec Sheet" in df.columns:
         validate="^https?:\\/\\/.+$"
     )
 
-# === Sidebar filters ===
+# === Global search input ===
+global_keyword = st.text_input("🔍 Global Keyword Search (any column)", "", key="global_keyword").strip().lower()
+
+# === Sidebar filters (dropdowns only) ===
 with st.sidebar:
-    st.caption("🧾 Columns found in Excel:")
-    st.code(", ".join(df.columns))
+    st.subheader("🛠️ Advanced Column Filters")
 
-    st.subheader("🔧 Keyword Filters")
-
-    # === Clear button ===
     if st.button("🔄 Clear All Filters"):
-        # Reset all session states for filters
         st.session_state["global_keyword"] = ""
         for col in filter_columns:
             st.session_state[f"multi_{col}"] = []
-            st.session_state[f"text_{col}"] = ""
         st.rerun()
 
-    # === Global search box
-    global_keyword = st.text_input("🔍 Global Keyword Search (any column)", "", key="global_keyword").strip().lower()
-
-    # === Filters
     multiselect_filters = {}
-    text_filters = {}
-
     for col in filter_columns:
         if col in df.columns:
-            st.markdown(f"**{col}**")
-
-            # Dropdown filter
             options = sorted(df[col].dropna().unique().tolist())
-            selected = st.multiselect(f"{col} (select)", options, key=f"multi_{col}")
+            selected = st.multiselect(f"{col}", options, key=f"multi_{col}")
             if selected:
                 multiselect_filters[col] = selected
-
-            # Text input filter
-            user_input = st.text_input(f"{col} (contains text)", key=f"text_{col}")
-            if user_input.strip():
-                text_filters[col] = user_input.strip().lower()
         else:
             st.warning(f"⚠️ Column not found in Excel: `{col}`", icon="⚠️")
 
-# === Apply all filters ===
+# === Apply filters ===
 filtered_df = df.copy()
 
 # Apply dropdown filters
 for col, selected_values in multiselect_filters.items():
     filtered_df = filtered_df[filtered_df[col].isin(selected_values)]
-
-# Apply text input filters
-for col, keyword in text_filters.items():
-    filtered_df = filtered_df[
-        filtered_df[col].astype(str).str.lower().str.contains(keyword)
-    ]
 
 # Apply global keyword filter
 if global_keyword:
