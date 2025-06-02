@@ -11,7 +11,7 @@ All filters support **keyword-based partial match**, so typing `MBES` will match
 """)
 
 # --- Load CSV ---
-df = pd.read_csv("USVs_Summary.csv")  # make sure this file exists in the Streamlit cloud environment
+df = pd.read_csv("USVs_Summary_improve.xlsx"), engine="openpyxl"  # make sure this file exists in the Streamlit cloud environment
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
