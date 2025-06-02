@@ -10,8 +10,8 @@ Use the filters below to interactively explore the dataset.
 All filters support **keyword-based partial match**, so typing `MBES` will match all relevant entries.
 """)
 
-# --- Load CSV ---
-df = pd.read_csv("USVs_Summary_improve.xlsx", engine="openpyxl")  # make sure this file exists in the Streamlit cloud environment
+# --- Load Excel ---
+df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
