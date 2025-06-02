@@ -7,8 +7,10 @@ st.title("📊 Global USV's Dashboard – Excel Viewer")
 
 st.markdown("""
 Use the filters below to explore the dataset.  
-Each column has both **dropdown filters** and **free-text search**.  
-You can type things like `MBES`, `solar`, or `Australia` to filter results.
+You can:
+- Type in the global **keyword box** to search across all columns  
+- Use **dropdown filters** for quick selection  
+- Or apply **free-text search** per column
 """)
 
 # === Load and clean Excel file ===
@@ -16,11 +18,11 @@ df = pd.read_excel("USVs_Summary_improve.xlsx", engine="openpyxl")
 df = df.dropna(how="all")
 df.columns = df.columns.str.strip()
 
-# === Show available columns for debugging ===
+# === Show columns for debugging (sidebar) ===
 st.sidebar.caption("🧾 Columns found in Excel:")
 st.sidebar.code(", ".join(df.columns))
 
-# === Convert 'Spec Sheet' column to clickable links ===
+# === Convert 'Spec Sheet' to clickable link ===
 link_config = {}
 if "Spec Sheet" in df.columns:
     df["Spec Sheet"] = df["Spec Sheet"].astype(str).apply(
@@ -32,7 +34,7 @@ if "Spec Sheet" in df.columns:
         validate="^https?:\\/\\/.+$"
     )
 
-# === Filter columns you want to include ===
+# === Column filters ===
 filter_columns = [
     "Name & Manufacturer",
     "Main Application",
@@ -46,13 +48,16 @@ filter_columns = [
     "Country of Origin"
 ]
 
-# === Session state ===
+# === Clear button
 if "clear_filters" not in st.session_state:
     st.session_state.clear_filters = False
 
+# === Global keyword box ===
+global_keyword = st.text_input("🔍 Global Keyword Search (any column)", "").strip().lower()
+
 # === Sidebar filters ===
 with st.sidebar:
-    st.subheader("🔍 Keyword Filters")
+    st.subheader("🔧 Advanced Column Filters")
 
     if st.button("🔄 Clear All Filters"):
         st.session_state.clear_filters = True
@@ -92,7 +97,13 @@ for col, values in multiselect_filters.items():
 for col, keyword in text_filters.items():
     filtered_df = filtered_df[filtered_df[col].astype(str).str.lower().str.contains(keyword)]
 
-# === Display results ===
+# Global keyword search across all columns
+if global_keyword:
+    filtered_df = filtered_df[
+        filtered_df.apply(lambda row: row.astype(str).str.lower().str.contains(global_keyword).any(), axis=1)
+    ]
+
+# === Display table ===
 st.markdown(f"Loaded `{filtered_df.shape[0]}` rows × `{filtered_df.shape[1]}` columns")
 st.markdown("### 📋 Filtered Results (Click 'Spec Sheet' to view links)")
 
